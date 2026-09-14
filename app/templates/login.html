@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Delega ATL{% endblock %}
+
+{% block auth_content %}
+<div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: radial-gradient(circle at top, #1e293b 0%, #0b0f19 100%); padding: 1.5rem;">
+    <div style="width: 100%; max-width: 420px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-xl); padding: 2.5rem; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7); position: relative; overflow: hidden;">
+        
+        <!-- Glow accent line -->
+        <div style="position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #3b82f6, #06b6d4, #8b5cf6);"></div>
+
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <div class="logo-badge" style="width: 52px; height: 52px; margin: 0 auto 1rem auto; font-size: 1.5rem;">
+                <i class="fa-solid fa-envelope-open-text"></i>
+            </div>
+            <h1 style="font-size: 1.6rem; font-weight: 700; margin-bottom: 0.35rem;">Delega ATL</h1>
+            <p style="color: var(--text-muted); font-size: 0.875rem;">Acesso ao Painel de Delegação de E-mails</p>
+        </div>
+
+        <form id="login-form" onsubmit="submitLogin(event)">
+            <div class="form-group">
+                <label class="form-label" for="username">
+                    <i class="fa-solid fa-user" style="margin-right: 0.4rem; color: #60a5fa;"></i> Usuário
+                </label>
+                <input type="text" id="username" name="username" class="form-input" placeholder="Digite seu usuário" required autofocus>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="password">
+                    <i class="fa-solid fa-lock" style="margin-right: 0.4rem; color: #60a5fa;"></i> Senha
+                </label>
+                <input type="password" id="password" name="password" class="form-input" placeholder="••••••••" required>
+            </div>
+
+            <button type="submit" id="btn-submit" class="btn btn-primary" style="width: 100%; padding: 0.85rem; font-size: 1rem; margin-top: 1rem;">
+                <i class="fa-solid fa-arrow-right-to-bracket"></i> Entrar no Sistema
+            </button>
+        </form>
+
+        <div style="margin-top: 2rem; padding-top: 1.25rem; border-top: 1px solid var(--border-color); text-align: center;">
+            <span style="font-size: 0.775rem; color: var(--text-dim);">
+                Protegido por Criptografia & Google Workspace API
+            </span>
+        </div>
+    </div>
+</div>
+
+<script>
+async function submitLogin(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btn-submit');
+    const userIn = document.getElementById('username').value.trim();
+    const passIn = document.getElementById('password').value;
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Autenticando...';
+
+    try {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: userIn, password: passIn })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showToast('Login realizado com sucesso! Redirecionando...', 'success');
+            setTimeout(() => {
+                window.location.href = '/delegations';
+            }, 800);
+        } else {
+            showToast(data.detail || 'Erro ao realizar login', 'error');
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Entrar no Sistema';
+        }
+    } catch (err) {
+        showToast('Erro de conexão com o servidor', 'error');
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Entrar no Sistema';
+    }
+}
+</script>
+{% endblock %}

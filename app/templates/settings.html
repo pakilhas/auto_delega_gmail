@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+
+{% block title %}Configurações Google Workspace - Delega ATL{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Configurações & Conexão Google</h1>
+        <p class="page-subtitle">Verifique o status da integração com a Service Account do Google Cloud e permissões do Google Workspace.</p>
+    </div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+    <!-- Card Status -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Status da Conta de Serviço</div>
+        </div>
+        
+        <div style="margin-bottom: 1.5rem;" id="google-status-box">
+            <div style="padding: 1rem; border-radius: var(--radius-md); background: rgba(255,255,255,0.03); border: 1px solid var(--border-color);">
+                <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; color: #60a5fa;"></i>
+                    <div>
+                        <div style="font-weight: 600;">Checando credenciais...</div>
+                        <div style="font-size: 0.8rem; color: var(--text-muted);">Aguardando verificação do arquivo de chaves</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div style="font-size: 0.875rem; color: var(--text-muted); line-height: 1.6;">
+            <p><strong>Caminho do Arquivo JSON:</strong> <code>/app/credentials/service_account.json</code></p>
+            <p><strong>E-mail Admin Personificado:</strong> <span id="admin-email-display">Carregando...</span></p>
+        </div>
+    </div>
+
+    <!-- Guia de Escopos -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Escopos OAuth Necessários no Google Admin</div>
+        </div>
+        
+        <p style="font-size: 0.875rem; color: var(--text-muted); margin-bottom: 1rem;">
+            No <strong>admin.google.com</strong> > <em>Segurança > Controles de API > Delegação em todo o domínio</em>, autorize o Client ID com os escopos:
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <div style="background: rgba(255,255,255,0.03); padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                <code style="color: #60a5fa; font-size: 0.8rem;">https://www.googleapis.com/auth/gmail.settings.basic</code>
+                <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.25rem;">Gerenciamento de delegados do Gmail</div>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.03); padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                <code style="color: #60a5fa; font-size: 0.8rem;">https://www.googleapis.com/auth/gmail.settings.sharing</code>
+                <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.25rem;">Permissões de compartilhamento da conta</div>
+            </div>
+
+            <div style="background: rgba(255,255,255,0.03); padding: 0.75rem; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                <code style="color: #60a5fa; font-size: 0.8rem;">https://www.googleapis.com/auth/admin.directory.user.readonly</code>
+                <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 0.25rem;">Listar usuários e e-mails do domínio</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function checkGoogleStatus() {
+    const box = document.getElementById('google-status-box');
+    const emailDisplay = document.getElementById('admin-email-display');
+
+    try {
+        const res = await fetch('/api/delegations/status-google');
+        if (res.ok) {
+            const data = await res.json();
+            emailDisplay.innerText = data.admin_email || 'Não configurado';
+
+            if (data.configured) {
+                box.innerHTML = `
+                    <div style="padding: 1rem; border-radius: var(--radius-md); background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3);">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-circle-check" style="font-size: 1.5rem; color: #34d399;"></i>
+                            <div>
+                                <div style="font-weight: 600; color: #34d399;">Chave JSON Detectada!</div>
+                                <div style="font-size: 0.8rem; color: var(--text-muted);">Arquivo de credenciais presente em <code>credentials/service_account.json</code></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                box.innerHTML = `
+                    <div style="padding: 1rem; border-radius: var(--radius-md); background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3);">
+                        <div style="display: flex; align-items: center; gap: 0.75rem;">
+                            <i class="fa-solid fa-triangle-exclamation" style="font-size: 1.5rem; color: #f87171;"></i>
+                            <div>
+                                <div style="font-weight: 600; color: #f87171;">Chave JSON não encontrada</div>
+                                <div style="font-size: 0.8rem; color: var(--text-muted);">Copie seu arquivo <code>service_account.json</code> para a pasta <code>credentials/</code></div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+    } catch (e) {
+        box.innerHTML = `<div style="color: #f87171;">Erro ao verificar status.</div>`;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    checkGoogleStatus();
+});
+</script>
+{% endblock %}

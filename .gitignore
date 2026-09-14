@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# Environment Variables & Secrets
+.env
+credentials/*.json
+!credentials/README.md
+
+# Database
+data/*.db
+data/*.sqlite3
+*.db
+*.sqlite3
+
+# IDEs & OS
+.vscode/
+.idea/
+*.swp
+*.swo
+Thumbs.db
+.DS_Store

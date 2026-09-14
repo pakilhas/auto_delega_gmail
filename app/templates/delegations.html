@@ -1,0 +1,391 @@
+{% extends "base.html" %}
+
+{% block title %}Delegações de E-mail - Delega ATL{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Gerenciamento de Delegações</h1>
+        <p class="page-subtitle">Configure e acompanhe quais usuários têm acesso para ler e enviar e-mails em nome de outras contas.</p>
+    </div>
+    <div>
+        <button id="btn-open-new-delegation" onclick="openModal('modal-create-delegation')" class="btn btn-primary">
+            <i class="fa-solid fa-plus"></i> Nova Delegação
+        </button>
+    </div>
+</div>
+
+<!-- Estatísticas e Busca Rápida -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
+        <div style="width: 48px; height: 48px; border-radius: var(--radius-md); background: rgba(59, 130, 246, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; color: #60a5fa;">
+            <i class="fa-solid fa-users"></i>
+        </div>
+        <div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Total de Contas Google</div>
+            <div style="font-size: 1.5rem; font-weight: 700;" id="total-accounts-count">Carregando...</div>
+        </div>
+    </div>
+    
+    <div class="card" style="padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
+        <div style="width: 48px; height: 48px; border-radius: var(--radius-md); background: rgba(16, 185, 129, 0.15); display: flex; align-items: center; justify-content: center; font-size: 1.4rem; color: #34d399;">
+            <i class="fa-solid fa-circle-check"></i>
+        </div>
+        <div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Contas Ativas</div>
+            <div style="font-size: 1.5rem; font-weight: 700;" id="active-accounts-count">-</div>
+        </div>
+    </div>
+</div>
+
+<!-- Lista de Contas do Domínio -->
+<div class="card" style="margin-bottom: 2rem;">
+    <div class="card-header" style="flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <div class="card-title"><i class="fa-solid fa-address-book" style="color: #60a5fa; margin-right: 0.5rem;"></i> Contas de E-mail do Domínio (Google Workspace)</div>
+            <div style="font-size: 0.825rem; color: var(--text-muted);">Selecione qualquer conta para ver seus delegados ou conceder acesso imediatamente.</div>
+        </div>
+        <div style="display: flex; gap: 0.5rem; flex-grow: 1; max-width: 400px;">
+            <input type="text" id="filter-accounts-input" onkeyup="filterAccountsTable()" class="form-input" placeholder="Filtrar por nome ou e-mail..." style="padding: 0.5rem 0.85rem; font-size: 0.875rem;">
+            <button onclick="loadDomainUsers()" class="btn btn-secondary btn-sm" title="Recarregar Contas do Google">
+                <i class="fa-solid fa-rotate"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="table-container" style="max-height: 420px; overflow-y: auto;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Nome do Usuário</th>
+                    <th>Endereço de E-mail</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Ações Rápidas</th>
+                </tr>
+            </thead>
+            <tbody id="domain-accounts-table-body">
+                <tr>
+                    <td colspan="4" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 0.5rem; display: block;"></i>
+                        Carregando contas do Google Workspace...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Painel de Delegados da Conta Selecionada -->
+<div class="card" id="delegates-section">
+    <div class="card-header">
+        <div>
+            <div class="card-title" id="table-heading"><i class="fa-solid fa-user-lock" style="color: #38bdf8; margin-right: 0.5rem;"></i> Delegados Ativos</div>
+            <div style="font-size: 0.825rem; color: var(--text-muted);" id="table-subheading">Clique em "Ver Delegados" em qualquer conta acima para visualizar quem acessa a caixa dela.</div>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Conta Principal (Caixa de Entrada)</th>
+                    <th>Usuário com Acesso (Delegatário)</th>
+                    <th>Status da Delegação</th>
+                    <th style="text-align: right;">Ações</th>
+                </tr>
+            </thead>
+            <tbody id="delegates-table-body">
+                <tr>
+                    <td colspan="4" style="text-align: center; color: var(--text-muted); padding: 2.5rem;">
+                        <i class="fa-solid fa-arrow-up" style="font-size: 1.5rem; margin-bottom: 0.5rem; display: block; opacity: 0.5;"></i>
+                        Selecione uma conta na lista acima para carregar suas delegações ativas no Gmail.
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Criar Nova Delegação -->
+<div id="modal-create-delegation" class="modal-backdrop">
+    <div class="modal">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+            <h3 style="font-size: 1.25rem; font-weight: 700;">Conceder Nova Delegação</h3>
+            <button onclick="closeModal('modal-create-delegation')" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.25rem;">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+        </div>
+
+        <form onsubmit="handleCreateDelegation(event)">
+            <div class="form-group">
+                <label class="form-label" for="delegator-email">
+                    <i class="fa-solid fa-inbox" style="color: #60a5fa;"></i> Conta que terá seu e-mail acessado (Delegada)
+                </label>
+                <input type="email" id="delegator-email" class="form-input" placeholder="ex: diretoria@seudominio.com.br" list="domain-users-list" required>
+                <datalist id="domain-users-list"></datalist>
+                <small style="color: var(--text-dim); font-size: 0.75rem;">Esta é a caixa de entrada que será aberta por outra pessoa.</small>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label" for="delegatee-email">
+                    <i class="fa-solid fa-user-plus" style="color: #34d399;"></i> Quem vai receber o acesso (Delegatário)
+                </label>
+                <input type="email" id="delegatee-email" class="form-input" placeholder="ex: assistente@seudominio.com.br" list="domain-users-list" required>
+                <small style="color: var(--text-dim); font-size: 0.75rem;">Este usuário poderá alternar e ler/enviar e-mails pela conta acima.</small>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 2rem;">
+                <button type="button" onclick="closeModal('modal-create-delegation')" class="btn btn-secondary">Cancelar</button>
+                <button type="submit" id="btn-save-delegation" class="btn btn-primary">
+                    <i class="fa-solid fa-check"></i> Conceder Delegação
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+var domainUsersCache = [];
+var currentSearchingAccount = '';
+
+function openModal(id) {
+    var modal = document.getElementById(id);
+    if (modal) {
+        modal.classList.add('show');
+    }
+}
+
+function closeModal(id) {
+    var modal = document.getElementById(id);
+    if (modal) {
+        modal.classList.remove('show');
+    }
+}
+
+async function loadDomainUsers() {
+    var tbody = document.getElementById('domain-accounts-table-body');
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Sincronizando contas do Google Workspace...</td></tr>';
+    }
+
+    try {
+        var res = await fetch('/api/delegations/domain-users');
+        if (res.ok) {
+            domainUsersCache = await res.json();
+            
+            var totalCountElem = document.getElementById('total-accounts-count');
+            if (totalCountElem) totalCountElem.innerText = domainUsersCache.length;
+
+            var activeCount = domainUsersCache.filter(function(u) { return !u.suspended; }).length;
+            var activeCountElem = document.getElementById('active-accounts-count');
+            if (activeCountElem) activeCountElem.innerText = activeCount;
+
+            var datalist = document.getElementById('domain-users-list');
+            if (datalist) {
+                datalist.innerHTML = '';
+                domainUsersCache.forEach(function(u) {
+                    var opt = document.createElement('option');
+                    opt.value = u.email;
+                    opt.label = u.name + ' (' + u.email + ')';
+                    datalist.appendChild(opt);
+                });
+            }
+
+            renderDomainAccountsTable(domainUsersCache);
+            showToast(domainUsersCache.length + ' contas carregadas com sucesso!', 'success');
+        } else {
+            var err = await res.json();
+            if (tbody) tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #f87171; padding: 2rem;">' + (err.detail || 'Erro ao carregar contas do Google.') + '</td></tr>';
+            showToast(err.detail || 'Erro ao buscar contas', 'error');
+        }
+    } catch (e) {
+        if (tbody) tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #f87171; padding: 2rem;">Falha de comunicação com o servidor.</td></tr>';
+    }
+}
+
+function renderDomainAccountsTable(users) {
+    var tbody = document.getElementById('domain-accounts-table-body');
+    if (!tbody) return;
+
+    if (users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 2rem;">Nenhuma conta encontrada com o filtro atual.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = '';
+    users.forEach(function(u) {
+        var tr = document.createElement('tr');
+        
+        var statusBadge = u.suspended
+            ? '<span class="status-pill status-expired"><i class="fa-solid fa-ban" style="font-size: 0.5rem;"></i> Suspensa</span>'
+            : '<span class="status-pill status-accepted"><i class="fa-solid fa-circle" style="font-size: 0.45rem;"></i> Ativa</span>';
+
+        tr.innerHTML = 
+            '<td><div style="font-weight: 600; color: var(--text-main);">' + (u.name || u.email) + '</div></td>' +
+            '<td><code style="color: #93c5fd; font-size: 0.85rem;">' + u.email + '</code></td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td style="text-align: right; white-space: nowrap;">' +
+                '<button onclick="fetchDelegatesForAccount(\'' + u.email + '\')" class="btn btn-secondary btn-sm" style="margin-right: 0.35rem;" title="Consultar Delegados">' +
+                    '<i class="fa-solid fa-eye"></i> Ver Delegados' +
+                '</button>' +
+                '<button onclick="quickOpenDelegationModal(\'' + u.email + '\')" class="btn btn-primary btn-sm" title="Conceder Acesso Desta Conta">' +
+                    '<i class="fa-solid fa-user-plus"></i> Delegar' +
+                '</button>' +
+            '</td>';
+        tbody.appendChild(tr);
+    });
+}
+
+function filterAccountsTable() {
+    var inputElem = document.getElementById('filter-accounts-input');
+    if (!inputElem) return;
+    var term = inputElem.value.toLowerCase().trim();
+    if (!term) {
+        renderDomainAccountsTable(domainUsersCache);
+        return;
+    }
+
+    var filtered = domainUsersCache.filter(function(u) {
+        return (u.name && u.name.toLowerCase().indexOf(term) !== -1) ||
+               (u.email && u.email.toLowerCase().indexOf(term) !== -1);
+    });
+    renderDomainAccountsTable(filtered);
+}
+
+function quickOpenDelegationModal(delegatorEmail) {
+    var delegatorInput = document.getElementById('delegator-email');
+    var delegateeInput = document.getElementById('delegatee-email');
+    if (delegatorInput) delegatorInput.value = delegatorEmail;
+    if (delegateeInput) delegateeInput.value = '';
+    openModal('modal-create-delegation');
+}
+
+async function fetchDelegatesForAccount(accountEmail) {
+    var tbody = document.getElementById('delegates-table-body');
+    var heading = document.getElementById('table-heading');
+    var subheading = document.getElementById('table-subheading');
+
+    currentSearchingAccount = accountEmail;
+    if (heading) heading.innerHTML = '<i class="fa-solid fa-user-lock" style="color: #38bdf8; margin-right: 0.5rem;"></i> Delegados de: <span style="color: #60a5fa;">' + accountEmail + '</span>';
+    if (subheading) subheading.innerText = 'Consultando delegados no Gmail...';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 2rem;"><i class="fa-solid fa-spinner fa-spin"></i> Carregando delegados configurados no Gmail...</td></tr>';
+
+    var sec = document.getElementById('delegates-section');
+    if (sec) sec.scrollIntoView({ behavior: 'smooth' });
+
+    try {
+        var res = await fetch('/api/delegations/list?account_email=' + encodeURIComponent(accountEmail));
+        var data = await res.json();
+
+        if (res.ok) {
+            if (subheading) subheading.innerText = 'Total de delegados com acesso: ' + data.delegates.length;
+
+            if (data.delegates.length === 0) {
+                if (tbody) tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 2.5rem;"><i class="fa-solid fa-circle-check" style="font-size: 1.5rem; color: #34d399; margin-bottom: 0.5rem; display: block;"></i>Ninguém tem acesso delegado à caixa de <strong>' + accountEmail + '</strong> no momento.</td></tr>';
+            } else {
+                if (tbody) tbody.innerHTML = '';
+                data.delegates.forEach(function(d) {
+                    var tr = document.createElement('tr');
+                    
+                    var statusClass = 'status-accepted';
+                    var statusLabel = 'Aceito (Ativo)';
+                    if (d.verificationStatus === 'pending') {
+                        statusClass = 'status-pending';
+                        statusLabel = 'Pendente';
+                    } else if (d.verificationStatus === 'expired' || d.verificationStatus === 'rejected') {
+                        statusClass = 'status-expired';
+                        statusLabel = 'Expirado / Rejeitado';
+                    }
+
+                    tr.innerHTML = 
+                        '<td><strong>' + accountEmail + '</strong></td>' +
+                        '<td><i class="fa-solid fa-user-check" style="color: #60a5fa; margin-right: 0.4rem;"></i><strong>' + d.delegateEmail + '</strong></td>' +
+                        '<td><span class="status-pill ' + statusClass + '"><i class="fa-solid fa-circle" style="font-size: 0.45rem;"></i> ' + statusLabel + '</span></td>' +
+                        '<td style="text-align: right;"><button onclick="handleDeleteDelegation(\'' + accountEmail + '\', \'' + d.delegateEmail + '\')" class="btn btn-danger btn-sm" title="Revogar Delegação"><i class="fa-solid fa-trash-can"></i> Revogar Acesso</button></td>';
+                    if (tbody) tbody.appendChild(tr);
+                });
+            }
+        } else {
+            if (tbody) tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: #f87171; padding: 2rem;">' + (data.detail || 'Erro ao consultar delegados.') + '</td></tr>';
+            showToast(data.detail || 'Erro ao consultar delegados', 'error');
+        }
+    } catch (err) {
+        showToast('Erro ao comunicar com o Gmail.', 'error');
+    }
+}
+
+async function handleCreateDelegation(e) {
+    e.preventDefault();
+    var delegator = document.getElementById('delegator-email').value.trim();
+    var delegatee = document.getElementById('delegatee-email').value.trim();
+    var btn = document.getElementById('btn-save-delegation');
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Processando...';
+
+    try {
+        var res = await fetch('/api/delegations/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                delegator_email: delegator,
+                delegatee_email: delegatee
+            })
+        });
+
+        var data = await res.json();
+
+        if (res.ok) {
+            showToast(data.message, 'success');
+            closeModal('modal-create-delegation');
+            document.getElementById('delegator-email').value = '';
+            document.getElementById('delegatee-email').value = '';
+            
+            fetchDelegatesForAccount(delegator);
+        } else {
+            showToast(data.detail || 'Falha ao conceder delegação', 'error');
+        }
+    } catch (err) {
+        showToast('Erro de conexão ao criar delegação', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-check"></i> Conceder Delegação';
+    }
+}
+
+async function handleDeleteDelegation(delegator, delegatee) {
+    if (!confirm('Tem certeza que deseja revogar o acesso de ' + delegatee + ' à conta ' + delegator + '?')) {
+        return;
+    }
+
+    try {
+        var res = await fetch('/api/delegations/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                delegator_email: delegator,
+                delegatee_email: delegatee
+            })
+        });
+
+        var data = await res.json();
+
+        if (res.ok) {
+            showToast(data.message, 'success');
+            fetchDelegatesForAccount(delegator);
+        } else {
+            showToast(data.detail || 'Falha ao revogar delegação', 'error');
+        }
+    } catch (err) {
+        showToast('Erro ao revogar delegação', 'error');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadDomainUsers();
+});
+</script>
+{% endblock %}

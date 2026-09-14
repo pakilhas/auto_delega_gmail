@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}Delegações Automáticas & Férias - Delega ATL{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title"><i class="fa-solid fa-robot" style="color: #60a5fa; margin-right: 0.5rem;"></i> Automações & Férias (Hermes)</h1>
+        <p class="page-subtitle">Acompanhe as delegações capturadas automaticamente por e-mail com data de início e término programados.</p>
+    </div>
+    <div style="display: flex; gap: 0.75rem;">
+        <button onclick="triggerEmailCheck()" id="btn-sync-emails" class="btn btn-primary">
+            <i class="fa-solid fa-inbox"></i> Ler Novos E-mails Agora
+        </button>
+        <button onclick="loadScheduled()" class="btn btn-secondary">
+            <i class="fa-solid fa-rotate"></i> Atualizar
+        </button>
+    </div>
+</div>
+
+<!-- Card de Status do Robô -->
+<div class="card" style="margin-bottom: 2rem; background: linear-gradient(135deg, rgba(37,99,235,0.08), rgba(6,182,212,0.05));">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <div style="width: 44px; height: 44px; border-radius: 50%; background: rgba(16,185,129,0.2); display: flex; align-items: center; justify-content: center; color: #34d399; font-size: 1.25rem;">
+                <i class="fa-solid fa-bolt"></i>
+            </div>
+            <div>
+                <div style="font-weight: 600; font-size: 1rem;">Monitoramento Contínuo Ativo</div>
+                <div style="font-size: 0.825rem; color: var(--text-muted);">O sistema checa a caixa <strong>suporte@atl.com.br</strong> a cada 60s procurando novos e-mails de <code>Delegação</code>.</div>
+            </div>
+        </div>
+        <div style="font-size: 0.85rem; color: var(--text-muted);">
+            <span class="status-pill status-accepted"><i class="fa-solid fa-circle" style="font-size: 0.4rem;"></i> Robô Operando</span>
+        </div>
+    </div>
+</div>
+
+<!-- Tabela de Solicitações Agendadas -->
+<div class="card">
+    <div class="card-header">
+        <div class="card-title">Solicitações de Férias e Agendamentos</div>
+        <input type="text" id="filter-scheduled" onkeyup="filterScheduledTable()" class="form-input" placeholder="Filtrar por nome ou e-mail..." style="max-width: 320px; font-size: 0.85rem; padding: 0.45rem 0.75rem;">
+    </div>
+
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Quem Sai (Delegante)</th>
+                    <th>Quem Assume (Delegatário)</th>
+                    <th>Motivo</th>
+                    <th>Início Programado</th>
+                    <th>Fim Programado</th>
+                    <th>Status</th>
+                    <th style="text-align: right;">Ações</th>
+                </tr>
+            </thead>
+            <tbody id="scheduled-table-body">
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 2.5rem; color: var(--text-muted);">
+                        <i class="fa-solid fa-spinner fa-spin" style="font-size: 1.5rem; margin-bottom: 0.5rem; display: block;"></i>
+                        Carregando delegações agendadas...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var scheduledListCache = [];
+
+async function loadScheduled() {
+    var tbody = document.getElementById('scheduled-table-body');
+    if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);"><i class="fa-solid fa-spinner fa-spin"></i> Carregando solicitações...</td></tr>';
+    }
+
+    try {
+        var res = await fetch('/api/scheduled');
+        if (res.ok) {
+            scheduledListCache = await res.json();
+            renderScheduledTable(scheduledListCache);
+        } else {
+            showToast('Erro ao carregar agendamentos', 'error');
+        }
+    } catch (e) {
+        showToast('Erro de conexão com o servidor', 'error');
+    }
+}
+
+function renderScheduledTable(items) {
+    var tbody = document.getElementById('scheduled-table-body');
+    if (!tbody) return;
+
+    if (items.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 3rem;"><i class="fa-solid fa-inbox" style="font-size: 2rem; opacity: 0.4; margin-bottom: 0.5rem; display: block;"></i>Nenhuma solicitação de delegação agendada no momento.</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = '';
+    items.forEach(function(item) {
+        var tr = document.createElement('tr');
+
+        var statusBadge = '';
+        var actionBtns = '';
+
+        if (item.status === 'pending_start') {
+            statusBadge = '<span class="status-pill status-pending"><i class="fa-solid fa-clock"></i> Aguardando Início</span>';
+            actionBtns = '<button onclick="applyNow(' + item.id + ')" class="btn btn-primary btn-sm" title="Ativar agora no Gmail"><i class="fa-solid fa-play"></i> Ativar Agora</button>';
+        } else if (item.status === 'active') {
+            statusBadge = '<span class="status-pill status-accepted"><i class="fa-solid fa-check"></i> Ativa no Gmail</span>';
+            actionBtns = '<button onclick="revokeNow(' + item.id + ')" class="btn btn-danger btn-sm" title="Revogar acesso agora"><i class="fa-solid fa-stop"></i> Encerrar</button>';
+        } else if (item.status === 'expired') {
+            statusBadge = '<span class="status-pill status-expired"><i class="fa-solid fa-check-double"></i> Concluída / Expirada</span>';
+            actionBtns = '<span style="color: var(--text-dim); font-size: 0.8rem;">Finalizada</span>';
+        } else {
+            statusBadge = '<span class="status-pill status-expired">' + item.status + '</span>';
+            actionBtns = '<button onclick="applyNow(' + item.id + ')" class="btn btn-secondary btn-sm"><i class="fa-solid fa-rotate-right"></i> Tentar Novamente</button>';
+        }
+
+        var spreadsheetLink = item.spreadsheet_url 
+            ? '<a href="' + item.spreadsheet_url + '" target="_blank" style="color: #60a5fa; font-size: 0.8rem; margin-left: 0.5rem;" title="Abrir Planilha"><i class="fa-solid fa-table"></i></a>' 
+            : '';
+
+        tr.innerHTML = 
+            '<td><div style="font-weight: 600;">' + item.delegator_name + '</div><small style="color: var(--text-muted);">' + item.delegator_email + '</small></td>' +
+            '<td><div style="font-weight: 600; color: #93c5fd;">' + item.delegatee_name + '</div><small style="color: var(--text-muted);">' + item.delegatee_email + '</small></td>' +
+            '<td>' + item.period_reason + spreadsheetLink + '</td>' +
+            '<td style="white-space: nowrap; font-size: 0.85rem;">' + item.start_time + '</td>' +
+            '<td style="white-space: nowrap; font-size: 0.85rem;">' + item.end_time + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td style="text-align: right; white-space: nowrap;">' + actionBtns + '</td>';
+
+        tbody.appendChild(tr);
+    });
+}
+
+function filterScheduledTable() {
+    var input = document.getElementById('filter-scheduled');
+    if (!input) return;
+    var term = input.value.toLowerCase().trim();
+    if (!term) {
+        renderScheduledTable(scheduledListCache);
+        return;
+    }
+
+    var filtered = scheduledListCache.filter(function(item) {
+        return (item.delegator_name && item.delegator_name.toLowerCase().indexOf(term) !== -1) ||
+               (item.delegator_email && item.delegator_email.toLowerCase().indexOf(term) !== -1) ||
+               (item.delegatee_name && item.delegatee_name.toLowerCase().indexOf(term) !== -1) ||
+               (item.delegatee_email && item.delegatee_email.toLowerCase().indexOf(term) !== -1);
+    });
+    renderScheduledTable(filtered);
+}
+
+async function triggerEmailCheck() {
+    var btn = document.getElementById('btn-sync-emails');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Lendo E-mails...';
+
+    try {
+        var res = await fetch('/api/scheduled/trigger-email-check', { method: 'POST' });
+        var data = await res.json();
+        if (res.ok) {
+            showToast(data.message, 'success');
+            loadScheduled();
+        } else {
+            showToast(data.detail || 'Erro ao checar e-mails', 'error');
+        }
+    } catch (e) {
+        showToast('Erro de conexão ao buscar e-mails', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-inbox"></i> Ler Novos E-mails Agora';
+    }
+}
+
+async function applyNow(id) {
+    if (!confirm('Deseja ativar esta delegação agora no Gmail?')) return;
+    try {
+        var res = await fetch('/api/scheduled/' + id + '/apply-now', { method: 'POST' });
+        var data = await res.json();
+        if (res.ok) {
+            showToast(data.message, 'success');
+            loadScheduled();
+        } else {
+            showToast(data.detail || 'Erro ao ativar delegação', 'error');
+        }
+    } catch (e) {
+        showToast('Erro de conexão', 'error');
+    }
+}
+
+async function revokeNow(id) {
+    if (!confirm('Deseja revogar e encerrar o acesso desta delegação no Gmail?')) return;
+    try {
+        var res = await fetch('/api/scheduled/' + id + '/revoke-now', { method: 'POST' });
+        var data = await res.json();
+        if (res.ok) {
+            showToast(data.message, 'success');
+            loadScheduled();
+        } else {
+            showToast(data.detail || 'Erro ao revogar delegação', 'error');
+        }
+    } catch (e) {
+        showToast('Erro de conexão', 'error');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadScheduled();
+});
+</script>
+{% endblock %}

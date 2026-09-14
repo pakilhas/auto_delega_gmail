@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}Logs de Auditoria - Delega ATL{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="page-title">Histórico e Auditoria</h1>
+        <p class="page-subtitle">Rastreabilidade completa de todas as delegações criadas, revogadas e acessos ao sistema.</p>
+    </div>
+    <div>
+        <button onclick="loadAuditLogs()" class="btn btn-secondary">
+            <i class="fa-solid fa-rotate"></i> Atualizar Logs
+        </button>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Data / Hora</th>
+                    <th>Operador</th>
+                    <th>Ação</th>
+                    <th>Conta Principal</th>
+                    <th>Conta Delegada</th>
+                    <th>Status</th>
+                    <th>Detalhes</th>
+                </tr>
+            </thead>
+            <tbody id="audit-table-body">
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 2rem;">
+                        <i class="fa-solid fa-spinner fa-spin"></i> Carregando logs de auditoria...
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadAuditLogs() {
+    const tbody = document.getElementById('audit-table-body');
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;"><i class="fa-solid fa-spinner fa-spin"></i> Carregando logs...</td></tr>';
+
+    try {
+        const res = await fetch('/api/delegations/audit-logs');
+        if (res.ok) {
+            const logs = await res.json();
+            if (logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 2.5rem;">Nenhum registro de auditoria no momento.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = '';
+            logs.forEach(l => {
+                const tr = document.createElement('tr');
+                const statusPill = l.status === 'SUCCESS' 
+                    ? '<span class="status-pill status-accepted">Sucesso</span>'
+                    : '<span class="status-pill status-expired">Falha</span>';
+
+                tr.innerHTML = `
+                    <td style="color: var(--text-muted); font-size: 0.85rem; white-space: nowrap;">${l.created_at}</td>
+                    <td><strong>${l.performed_by}</strong></td>
+                    <td><code style="background: rgba(255,255,255,0.06); padding: 0.2rem 0.4rem; border-radius: 4px;">${l.action}</code></td>
+                    <td>${l.delegator_email || '-'}</td>
+                    <td>${l.delegatee_email || '-'}</td>
+                    <td>${statusPill}</td>
+                    <td style="font-size: 0.85rem; color: var(--text-muted); max-width: 320px;">${l.details || '-'}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+    } catch (e) {
+        showToast('Erro ao carregar auditoria', 'error');
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadAuditLogs();
+});
+</script>
+{% endblock %}

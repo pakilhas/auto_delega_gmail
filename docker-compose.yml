@@ -1,0 +1,17 @@
+services:
+  delega-atl:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: delega_atl_app
+    restart: unless-stopped
+    ports:
+      - "3000:8000"
+    env_file:
+      - .env
+    environment:
+      - TZ=America/Sao_Paulo
+    volumes:
+      - ./data:/app/data
+      - ./credentials:/app/credentials
+      - ./app:/app/app
